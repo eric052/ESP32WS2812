@@ -3,55 +3,453 @@
 <head>
   <meta charset="UTF-8" />
   <title>ESP32 WS2812 Controller</title>
+
+  <!-- Google Font [web:94][web:103] -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
   <style>
-    body { font-family: Arial, sans-serif; max-width: 480px; margin: 20px auto; }
-    button { padding: 8px 16px; margin: 4px 0; }
-    .row { margin: 8px 0; }
-    label { display: inline-block; width: 90px; }
-    input[type="range"] { width: 200px; }
+    :root {
+      --bg-gradient: linear-gradient(135deg, #111827, #1f2937);
+      --card-bg: rgba(17, 24, 39, 0.9);
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.25);
+      --accent-strong: #2563eb;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border-subtle: rgba(55, 65, 81, 0.9);
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-main);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card-bg);
+      border-radius: 20px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow:
+        0 18px 45px rgba(15, 23, 42, 0.8),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+      padding: 22px 24px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -120px;
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, 0.18) 0, transparent 55%),
+        radial-gradient(circle at bottom right, rgba(248, 250, 252, 0.06) 0, transparent 60%);
+      opacity: 0.9;
+      z-index: -1;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-pill {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      color: var(--text-muted);
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border-subtle);
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.15), transparent 60%);
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #6b7280;
+      box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.7);
+    }
+
+    .status-pill.connected {
+      border-color: rgba(34, 197, 94, 0.8);
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.25), transparent 65%);
+      color: #bbf7d0;
+    }
+
+    .status-pill.connected .status-dot {
+      background: var(--success);
+      box-shadow:
+        0 0 0 1px rgba(22, 163, 74, 0.8),
+        0 0 8px rgba(34, 197, 94, 0.7);
+    }
+
+    .section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .card-section {
+      padding: 10px 12px 12px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
+      border: 1px solid rgba(31, 41, 55, 0.95);
+      margin-bottom: 10px;
+    }
+
+    .card-section-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .row {
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    select,
+    input[type="color"],
+    button {
+      font-family: inherit;
+    }
+
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      appearance: none;
+      position: relative;
+    }
+
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.5);
+    }
+
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select-wrapper::after {
+      content: "▾";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    input[type="color"] {
+      width: 46px;
+      height: 28px;
+      padding: 0;
+      border-radius: 999px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border-radius: 999px;
+      border: none;
+    }
+
+    input[type="color"]::-moz-color-swatch {
+      border-radius: 999px;
+      border: none;
+    }
+
+    /* 自訂 range slider [web:93][web:99] */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent) 0%, #4ade80 60%, #f97316 100%);
+      outline: none;
+      opacity: 0.9;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #f9fafb;
+      border: 2px solid var(--accent-strong);
+      box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.9),
+        0 6px 10px rgba(15, 23, 42, 0.8);
+      cursor: pointer;
+      margin-top: -5px;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #f9fafb;
+      border: 2px solid var(--accent-strong);
+      box-shadow:
+        0 0 0 2px rgba(15, 23, 42, 0.9),
+        0 6px 10px rgba(15, 23, 42, 0.8);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent) 0%, #4ade80 60%, #f97316 100%);
+    }
+
+    .slider-value {
+      font-size: 11px;
+      min-width: 30px;
+      text-align: right;
+      color: var(--text-muted);
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .btn {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease-out;
+      background: transparent;
+      color: var(--text-main);
+    }
+
+    .btn-primary {
+      background: radial-gradient(circle at top left, var(--accent), var(--accent-strong));
+      border-color: rgba(37, 99, 235, 0.7);
+      box-shadow:
+        0 12px 25px rgba(37, 99, 235, 0.45),
+        0 0 0 1px rgba(15, 23, 42, 0.8);
+      color: #e5edff;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        0 14px 30px rgba(37, 99, 235, 0.55),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+      filter: brightness(1.03);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+      box-shadow:
+        0 8px 15px rgba(30, 64, 175, 0.5),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    .btn-outline {
+      border-color: rgba(148, 163, 184, 0.7);
+      background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
+      color: var(--text-muted);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--accent);
+      color: #dbeafe;
+    }
+
+    .footer-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      opacity: 0.9;
+    }
+
+    .footer-hint strong {
+      color: #e5e7eb;
+      font-weight: 500;
+    }
+
+    @media (max-width: 520px) {
+      .card {
+        padding: 18px 16px 16px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h2>ESP32 WS2812 Controller</h2>
+  <div class="card">
+    <div class="card-header">
+      <div class="title-block">
+        <div class="title">
+          ESP32 LED Controller
+          <span class="title-pill">WS2812 • BLE</span>
+        </div>
+        <div class="subtitle">控制 ESP32 上的 WS2812 燈條（Web Bluetooth）</div>
+      </div>
+      <div id="statusPill" class="status-pill">
+        <span class="status-dot"></span>
+        <span id="statusText">Disconnected</span>
+      </div>
+    </div>
 
-  <div class="row">
-    <button id="btnConnect">Connect</button>
-    <span id="status">Not connected</span>
-  </div>
+    <div class="card-section">
+      <div class="section-label">Connection</div>
+      <div class="button-row" style="justify-content:flex-start;">
+        <button id="btnConnect" class="btn btn-outline">
+          🔗 Connect
+        </button>
+      </div>
+    </div>
 
-  <div class="row">
-    <label for="mode">Mode</label>
-    <select id="mode">
-      <option value="0">OFF</option>
-      <option value="1" selected>Static</option>
-      <option value="2">Breath</option>
-      <option value="3">Rainbow</option>
-    </select>
-  </div>
+    <div class="card-section">
+      <div class="section-label">Lighting</div>
+      <div class="card-section-row">
+        <div class="control-group">
+          <label for="mode">模式 Mode</label>
+          <div class="select-wrapper">
+            <select id="mode">
+              <option value="0">OFF</option>
+              <option value="1" selected>Static 固定</option>
+              <option value="2">Breath 呼吸</option>
+              <option value="3">Rainbow 彩虹</option>
+            </select>
+          </div>
+        </div>
 
-  <div class="row">
-    <label for="color">Color</label>
-    <input type="color" id="color" value="#ff0000" />
-  </div>
+        <div class="control-group">
+          <label for="color">顏色 Color</label>
+          <input type="color" id="color" value="#ff0000" />
+        </div>
+      </div>
+    </div>
 
-  <div class="row">
-    <label for="speed">Speed</label>
-    <input type="range" id="speed" min="0" max="255" value="50" />
-    <span id="speedVal">50</span>
-  </div>
+    <div class="card-section">
+      <div class="section-label">Dynamics</div>
 
-  <div class="row">
-    <label for="brightness">Brightness</label>
-    <input type="range" id="brightness" min="0" max="255" value="255" />
-    <span id="brightnessVal">255</span>
-  </div>
+      <div class="row">
+        <label for="speed">速度 Speed</label>
+        <div class="slider-row">
+          <input type="range" id="speed" min="0" max="255" value="50" />
+          <span id="speedVal" class="slider-value">50</span>
+        </div>
+      </div>
 
-  <div class="row">
-    <button id="btnSend">Send</button>
+      <div class="row">
+        <label for="brightness">亮度 Brightness</label>
+        <div class="slider-row">
+          <input type="range" id="brightness" min="0" max="255" value="255" />
+          <span id="brightnessVal" class="slider-value">255</span>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="btnSend" class="btn btn-primary">
+          ▶ Apply
+        </button>
+      </div>
+    </div>
+
+    <div class="footer-hint">
+      <span><strong>提示：</strong>僅支援 Chrome / Edge 且需 HTTPS 或 localhost。</span>
+      <span id="status" style="opacity:0.85;">Ready.</span>
+    </div>
   </div>
 
   <script>
-    // 要和 Arduino 程式完全一致的 UUID [web:11]
+    // 與 Arduino 一致的 UUID [web:11]
     const SERVICE_UUID      = '12345678-1234-5678-1234-56789abcdef0';
     const CONTROL_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef1';
 
@@ -60,6 +458,8 @@
     let controlChar = null;
 
     const statusSpan   = document.getElementById('status');
+    const statusPill   = document.getElementById('statusPill');
+    const statusText   = document.getElementById('statusText');
     const btnConnect   = document.getElementById('btnConnect');
     const btnSend      = document.getElementById('btnSend');
     const modeSelect   = document.getElementById('mode');
@@ -76,42 +476,64 @@
       brightVal.textContent = brightRange.value;
     });
 
-    // 連線流程 [web:57][web:64]
+    // 更新連線狀態樣式
+    function setConnectedUI(connected) {
+      if (connected) {
+        statusPill.classList.add('connected');
+        statusText.textContent = 'Connected';
+        btnConnect.textContent = '🔁 Reconnect';
+      } else {
+        statusPill.classList.remove('connected');
+        statusText.textContent = 'Disconnected';
+        btnConnect.textContent = '🔗 Connect';
+      }
+    }
+
+    // 連線 [web:57][web:64]
     btnConnect.addEventListener('click', async () => {
       try {
-        statusSpan.textContent = 'Requesting device...';
+        statusSpan.textContent = 'Requesting Bluetooth device...';
         device = await navigator.bluetooth.requestDevice({
           filters: [{ services: [SERVICE_UUID] }]
         });
 
-        statusSpan.textContent = 'Connecting...';
+        statusSpan.textContent = 'Connecting to GATT server...';
         server = await device.gatt.connect();
+
         const service = await server.getPrimaryService(SERVICE_UUID);
         controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
 
         statusSpan.textContent = 'Connected to ' + device.name;
+        setConnectedUI(true);
+
+        // 若裝置中斷連線，可在這裡處理（進階可加 auto-reconnect）
+        device.addEventListener('gattserverdisconnected', () => {
+          setConnectedUI(false);
+          statusSpan.textContent = 'Device disconnected.';
+        });
       } catch (error) {
         console.error(error);
         statusSpan.textContent = 'Error: ' + error;
+        setConnectedUI(false);
       }
     });
 
-    // 組 6 bytes 並寫入 [web:55][web:58]
+    // 送 6 bytes 指令 [web:55][web:58]
     async function sendCommand() {
       if (!controlChar) {
         alert('Not connected to device');
         return;
       }
 
-      const mode = parseInt(modeSelect.value);
+      const mode = parseInt(modeSelect.value, 10);
 
       const hex = colorInput.value.replace('#', '');
       const r = parseInt(hex.substring(0, 2), 16);
       const g = parseInt(hex.substring(2, 4), 16);
       const b = parseInt(hex.substring(4, 6), 16);
 
-      const speed = parseInt(speedRange.value);
-      const brightness = parseInt(brightRange.value);
+      const speed = parseInt(speedRange.value, 10);
+      const brightness = parseInt(brightRange.value, 10);
 
       const data = new Uint8Array([
         mode & 0xFF,
@@ -124,6 +546,7 @@
 
       try {
         await controlChar.writeValue(data);
+        statusSpan.textContent = 'Command sent.';
         console.log('Sent:', data);
       } catch (error) {
         console.error(error);
@@ -133,7 +556,7 @@
 
     btnSend.addEventListener('click', sendCommand);
 
-    // 如要即時更新，可以解開註解：
+    // 若想要「即時更新」，可以開下面這幾行：
     // modeSelect.addEventListener('change', sendCommand);
     // colorInput.addEventListener('input', sendCommand);
     // speedRange.addEventListener('change', sendCommand);
