@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 WS2812 Controller</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 480px; margin: 20px auto; }
+    button { padding: 8px 16px; margin: 4px 0; }
+    .row { margin: 8px 0; }
+    label { display: inline-block; width: 90px; }
+    input[type="range"] { width: 200px; }
+  </style>
+</head>
+<body>
+  <h2>ESP32 WS2812 Controller</h2>
+
+  <div class="row">
+    <button id="btnConnect">Connect</button>
+    <span id="status">Not connected</span>
+  </div>
+
+  <div class="row">
+    <label for="mode">Mode</label>
+    <select id="mode">
+      <option value="0">OFF</option>
+      <option value="1" selected>Static</option>
+      <option value="2">Breath</option>
+      <option value="3">Rainbow</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="color">Color</label>
+    <input type="color" id="color" value="#ff0000" />
+  </div>
+
+  <div class="row">
+    <label for="speed">Speed</label>
+    <input type="range" id="speed" min="0" max="255" value="50" />
+    <span id="speedVal">50</span>
+  </div>
+
+  <div class="row">
+    <label for="brightness">Brightness</label>
+    <input type="range" id="brightness" min="0" max="255" value="255" />
+    <span id="brightnessVal">255</span>
+  </div>
+
+  <div class="row">
+    <button id="btnSend">Send</button>
+  </div>
+
+  <script>
+    // 要和 Arduino 程式完全一致的 UUID [web:11]
+    const SERVICE_UUID      = '12345678-1234-5678-1234-56789abcdef0';
+    const CONTROL_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef1';
+
+    let device = null;
+    let server = null;
+    let controlChar = null;
+
+    const statusSpan   = document.getElementById('status');
+    const btnConnect   = document.getElementById('btnConnect');
+    const btnSend      = document.getElementById('btnSend');
+    const modeSelect   = document.getElementById('mode');
+    const colorInput   = document.getElementById('color');
+    const speedRange   = document.getElementById('speed');
+    const speedVal     = document.getElementById('speedVal');
+    const brightRange  = document.getElementById('brightness');
+    const brightVal    = document.getElementById('brightnessVal');
+
+    speedRange.addEventListener('input', () => {
+      speedVal.textContent = speedRange.value;
+    });
+    brightRange.addEventListener('input', () => {
+      brightVal.textContent = brightRange.value;
+    });
+
+    // 連線流程 [web:57][web:64]
+    btnConnect.addEventListener('click', async () => {
+      try {
+        statusSpan.textContent = 'Requesting device...';
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }]
+        });
+
+        statusSpan.textContent = 'Connecting...';
+        server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        controlChar = await service.getCharacteristic(CONTROL_CHAR_UUID);
+
+        statusSpan.textContent = 'Connected to ' + device.name;
+      } catch (error) {
+        console.error(error);
+        statusSpan.textContent = 'Error: ' + error;
+      }
+    });
+
+    // 組 6 bytes 並寫入 [web:55][web:58]
+    async function sendCommand() {
+      if (!controlChar) {
+        alert('Not connected to device');
+        return;
+      }
+
+      const mode = parseInt(modeSelect.value);
+
+      const hex = colorInput.value.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+
+      const speed = parseInt(speedRange.value);
+      const brightness = parseInt(brightRange.value);
+
+      const data = new Uint8Array([
+        mode & 0xFF,
+        r & 0xFF,
+        g & 0xFF,
+        b & 0xFF,
+        speed & 0xFF,
+        brightness & 0xFF
+      ]);
+
+      try {
+        await controlChar.writeValue(data);
+        console.log('Sent:', data);
+      } catch (error) {
+        console.error(error);
+        statusSpan.textContent = 'Write error: ' + error;
+      }
+    }
+
+    btnSend.addEventListener('click', sendCommand);
+
+    // 如要即時更新，可以解開註解：
+    // modeSelect.addEventListener('change', sendCommand);
+    // colorInput.addEventListener('input', sendCommand);
+    // speedRange.addEventListener('change', sendCommand);
+    // brightRange.addEventListener('change', sendCommand);
+  </script>
+</body>
+</html>
